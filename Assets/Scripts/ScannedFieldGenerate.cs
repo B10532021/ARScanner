@@ -141,9 +141,20 @@ public class ScannedFieldGenerate : MonoBehaviour
     public List<Vector3> GetWorldCoordinate(Simplex<Vertex2> points)
     {
         List<Vector3> vertices = new List<Vector3>();
-        vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[0].X, points.Vertices[0].Y, points.Vertices[0].depth)));
-        vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[1].X, points.Vertices[1].Y, points.Vertices[1].depth)));
-        vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[2].X, points.Vertices[2].Y, points.Vertices[2].depth)));
+        // positive if points are CCW negative if they're CW
+        if((points.Vertices[1].X - points.Vertices[0].X) * (points.Vertices[2].Y - points.Vertices[0].Y)
+            - (points.Vertices[2].X - points.Vertices[0].X) * (points.Vertices[1].Y - points.Vertices[0].Y) < 0)
+        {
+            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[0].X, points.Vertices[0].Y, points.Vertices[0].depth)));
+            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[1].X, points.Vertices[1].Y, points.Vertices[1].depth)));
+            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[2].X, points.Vertices[2].Y, points.Vertices[2].depth)));
+        }
+        else
+        {
+            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[0].X, points.Vertices[0].Y, points.Vertices[0].depth)));
+            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[2].X, points.Vertices[2].Y, points.Vertices[2].depth)));
+            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[1].X, points.Vertices[1].Y, points.Vertices[1].depth)));
+        }
 
         return vertices;
     }
