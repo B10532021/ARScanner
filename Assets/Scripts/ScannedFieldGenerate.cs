@@ -14,6 +14,7 @@ public class ScannedFieldGenerate : MonoBehaviour
     public Camera Cam;
     public List<Vector3> PointClouds = new List<Vector3>();
     public List<Vector3> PointClouds2D = new List<Vector3>();
+    public int limitDistance;
     // The delaunay mesh
 
     private DelaunayTriangulation2 delaunay;
@@ -25,7 +26,6 @@ public class ScannedFieldGenerate : MonoBehaviour
     // Prefab which is generated for each chunk of the mesh.
     public Transform chunkPrefab = null;
     public GameObject sphere;
-    private bool draw = true;
 
     void Start()
     {
@@ -71,18 +71,16 @@ public class ScannedFieldGenerate : MonoBehaviour
         }
         ClearListPoints();
 
-        if (draw)
+
+        AddAllPointsToList();
+        if (PointClouds.Count > 10)
         {
-            AddAllPointsToList();
-            if (PointClouds.Count > 3)
-            {
-                WorldToScreenCoordinate();
-                DelaunayTriangulation();
-                DrawPointsAndLines();
-                UpdateMesh();
-                draw = false;
-            }
+            WorldToScreenCoordinate();
+            DelaunayTriangulation();
+            // DrawPointsAndLines();
+            UpdateMesh();
         }
+
     }
 
     private void OnDisable()
@@ -104,7 +102,11 @@ public class ScannedFieldGenerate : MonoBehaviour
             for (int i = 0; i < Frame.PointCloud.PointCount; i++)
             {
                 PointCloudPoint point = Frame.PointCloud.GetPointAsStruct(i);
-                PointClouds.Add(point.Position);
+                // if the distance from point cloud to camera is less than 5 meter
+                if (point.Position.sqrMagnitude - Cam.transform.position.sqrMagnitude < limitDistance)
+                {
+                    PointClouds.Add(point.Position);
+                }               
             }
             PointCloudLog = "PointClouds:" + PointClouds.Count + "\n";
             PointCloudText.text = "PointClouds:" + PointClouds.Count + "\n";

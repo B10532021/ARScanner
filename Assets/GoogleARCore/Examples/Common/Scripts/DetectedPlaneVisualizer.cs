@@ -65,13 +65,13 @@ namespace GoogleARCore.Examples.Common
             }
             else if (m_DetectedPlane.SubsumedBy != null)
             {
-                Destroy(gameObject);
+                // Destroy(gameObject);
                 return;
             }
             else if (m_DetectedPlane.TrackingState != TrackingState.Tracking)
             {
-                 m_MeshRenderer.enabled = false;
-                 return;
+                m_MeshRenderer.enabled = false;
+                return;
             }
 
             m_MeshRenderer.enabled = true;

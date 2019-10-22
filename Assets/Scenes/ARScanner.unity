@@ -423,7 +423,7 @@ MonoBehaviour:
   Cam: {fileID: 1930229005}
   PointClouds: []
   PointClouds2D: []
-  PointCLoudText: {fileID: 674128590}
+  PointCloudText: {fileID: 674128590}
   chunkPrefab: {fileID: 4760822391077712, guid: 00a4cb1aab563c343a0424f38f2ed8f0,
     type: 3}
   sphere: {fileID: 7677034186204955411, guid: 7e79185a3a1b3604fb017fc4f202ce19, type: 3}
@@ -754,7 +754,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1829515894
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -767,7 +767,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c669a4cc43174caea1a3748b76f2652, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  DetectedPlaneLog: {fileID: 0}
   DetectedPlanePrefab: {fileID: 1654175882956584, guid: 6a35c744e5010405c847fad90282d2be,
     type: 3}
 --- !u!4 &1829515895

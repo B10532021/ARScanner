@@ -85,7 +85,7 @@ namespace GoogleARCore.Examples.HelloAR
         {
             _UpdateApplicationLifecycle();
 
-            // If the player has not touched the screen, we are done with this update.
+            /*// If the player has not touched the screen, we are done with this update.
             Touch touch;
             if (Input.touchCount < 1 || (touch = Input.GetTouch(0)).phase != TouchPhase.Began)
             {
@@ -152,7 +152,7 @@ namespace GoogleARCore.Examples.HelloAR
                     // Make game object a child of the anchor.
                     gameObject.transform.parent = anchor.transform;
                 }
-            }
+            }*/
         }
 
         /// <summary>

@@ -30,8 +30,6 @@ namespace GoogleARCore.Examples.Common
     /// </summary>
     public class DetectedPlaneGenerator : MonoBehaviour
     {
-        public Text DetectedPlaneLog;
-        private bool write = true;
         /// <summary>
         /// A prefab for tracking and visualizing detected planes.
         /// </summary>
@@ -62,16 +60,6 @@ namespace GoogleARCore.Examples.Common
                 List<Vector3> planePoints = new List<Vector3>();
                 Vector3 planeCenter = m_NewPlanes[i].CenterPose.position;
                 m_NewPlanes[i].GetBoundaryPolygon(planePoints);
-
-                if (write)
-                {
-                    DetectedPlaneLog.text += "" + planePoints.Count + "\n";
-                    for (int j = 0; j < planePoints.Count; j++)
-                    {
-                        DetectedPlaneLog.text += "" + planePoints[j][0] + ", " + planePoints[j][1] + ", " + planePoints[j][2] + "\n";
-                    }
-                    write = false;
-                }
 
                 // Instantiate a plane visualization prefab and set it to track the new plane. The
                 // transform is set to the origin with an identity rotation since the mesh for our

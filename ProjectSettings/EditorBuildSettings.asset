@@ -8,4 +8,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/ARScanner.unity
     guid: d8226dd024434474c805282007803b9a
+  - enabled: 0
+    path: Assets/GoogleARCore/Examples/HelloAR/Scenes/HelloAR.unity
+    guid: e6a6fa04348cb45c9b0221eb19c946da
   m_configObjects: {}
