@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 4760822391077712}
   - component: {fileID: 33798021047055076}
   - component: {fileID: 23247137960634504}
+  - component: {fileID: 7978684289621662826}
   - component: {fileID: 64308250482023768}
   m_Layer: 0
   m_Name: ChunkPrefab
@@ -78,6 +79,18 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+--- !u!114 &7978684289621662826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1313918565212052}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e8d09d4a0d08da42937109ed86b5b59, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!64 &64308250482023768
 MeshCollider:
   m_ObjectHideFlags: 0

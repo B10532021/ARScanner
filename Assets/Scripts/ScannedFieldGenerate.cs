@@ -25,7 +25,10 @@ public class ScannedFieldGenerate : MonoBehaviour
     private string pointcloudFilePath;
     // Prefab which is generated for each chunk of the mesh.
     public Transform chunkPrefab = null;
+    public GameObject ScannedFieldPrefab;
     public GameObject sphere;
+
+    private bool draw = true;
 
     void Start()
     {
@@ -70,8 +73,6 @@ public class ScannedFieldGenerate : MonoBehaviour
             return;
         }
         ClearListPoints();
-
-
         AddAllPointsToList();
         if (PointClouds.Count > 10)
         {
@@ -96,14 +97,13 @@ public class ScannedFieldGenerate : MonoBehaviour
 
     private void AddAllPointsToList()
     {
-
         if (Frame.PointCloud.IsUpdatedThisFrame && Frame.PointCloud.PointCount >= 10)
         {
             for (int i = 0; i < Frame.PointCloud.PointCount; i++)
             {
                 PointCloudPoint point = Frame.PointCloud.GetPointAsStruct(i);
                 // if the distance from point cloud to camera is less than 5 meter
-                if (point.Position.sqrMagnitude - Cam.transform.position.sqrMagnitude < limitDistance)
+                if (Vector3.Distance(point.Position, Cam.transform.position) < limitDistance)
                 {
                     PointClouds.Add(point.Position);
                 }               
@@ -172,56 +172,17 @@ public class ScannedFieldGenerate : MonoBehaviour
         List<Vector3> normals = new List<Vector3>();
         List<Vector2> uvs = new List<Vector2>();
         List<int> triangles = new List<int>();
-        int count = 0;
-        int triangleCount = 0;
 
         TriangleLog += "TriangleCount:" + delaunay.Cells.Count + "\nTriangleID:\n";
         foreach (DelaunayCell<Vertex2> cell in delaunay.Cells)
         {
             List<Vector3> triangleVertices = GetWorldCoordinate(cell.Simplex);
 
-            TriangleLog += (count + 1) + ", VerTicesID:";
-            TriangleLog += cell.Simplex.Vertices[0].pointID + ", " + cell.Simplex.Vertices[1].pointID + ", " + cell.Simplex.Vertices[2].pointID + "\n";
-            TriangleLog += "x:" + triangleVertices[0].x + ", y:" + triangleVertices[0].y + ", z:" + triangleVertices[0].z + "\n";
-            TriangleLog += "x:" + triangleVertices[1].x + ", y:" + triangleVertices[1].y + ", z:" + triangleVertices[1].z + "\n";
-            TriangleLog += "x:" + triangleVertices[2].x + ", y:" + triangleVertices[2].y + ", z:" + triangleVertices[2].z + "\n";
+            Transform chunk = Instantiate<Transform>(chunkPrefab, transform.position, transform.rotation);
+            chunk.GetComponent<ScannedFieldVisualizer>().Initialize(triangleVertices);
 
-            triangles.Add(count);
-            triangles.Add(count + 1);
-            triangles.Add(count + 2);
-
-            vertices.Add(triangleVertices[0]);
-            vertices.Add(triangleVertices[1]);
-            vertices.Add(triangleVertices[2]);
-
-            Vector3 normal = Vector3.Cross(triangleVertices[1] - triangleVertices[0], triangleVertices[2] - triangleVertices[0]);
-            normals.Add(normal);
-            normals.Add(normal);
-            normals.Add(normal);
-
-            uvs.Add(new Vector2(0.0f, 0.0f));
-            uvs.Add(new Vector2(0.0f, 0.0f));
-            uvs.Add(new Vector2(0.0f, 0.0f));
-
-            triangleCount += 1;
-            count += 3;
+           
         }
-
-        Mesh chunkMesh = new Mesh();
-        chunkMesh.vertices = vertices.ToArray();
-        chunkMesh.uv = uvs.ToArray();
-        chunkMesh.triangles = triangles.ToArray();
-        chunkMesh.normals = normals.ToArray();
-
-        Transform chunk = Instantiate<Transform>(chunkPrefab, transform.position, transform.rotation);
-        chunk.GetComponent<MeshFilter>().mesh = chunkMesh;
-        chunk.GetComponent<MeshCollider>().sharedMesh = chunkMesh;
-        chunk.transform.parent = transform;
-
-        TriangleLog += "CreateTraingle:" + triangleCount + "\n";
-        TriangleLog += "finish meshing\n";
-        // WriteToFile(triangleFilePath, TriangleText.text);
-
     }
 
     public void DrawPointsAndLines()
@@ -259,3 +220,34 @@ public class ScannedFieldGenerate : MonoBehaviour
     }
 }
 
+/*triangles.Clear();
+           triangles.Add(0);
+           triangles.Add(1);
+           triangles.Add(2);
+
+           vertices.Clear();
+           vertices.Add(triangleVertices[0]);
+           vertices.Add(triangleVertices[1]);
+           vertices.Add(triangleVertices[2]);
+
+           Vector3 normal = Vector3.Cross(triangleVertices[1] - triangleVertices[0], triangleVertices[2] - triangleVertices[0]);
+           normals.Clear();
+           normals.Add(normal);
+           normals.Add(normal);
+           normals.Add(normal);
+
+           uvs.Clear();
+           uvs.Add(new Vector2(0.0f, 0.0f));
+           uvs.Add(new Vector2(0.0f, 0.0f));
+           uvs.Add(new Vector2(0.0f, 0.0f));
+
+           Mesh chunkMesh = new Mesh();
+           chunkMesh.vertices = vertices.ToArray();
+           chunkMesh.uv = uvs.ToArray();
+           chunkMesh.triangles = triangles.ToArray();
+           chunkMesh.normals = normals.ToArray();
+
+           Transform chunk = Instantiate<Transform>(chunkPrefab, transform.position, transform.rotation);
+           chunk.GetComponent<MeshFilter>().mesh = chunkMesh;
+           chunk.GetComponent<MeshCollider>().sharedMesh = chunkMesh;
+           chunk.transform.parent = transform;*/
