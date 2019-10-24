@@ -19,22 +19,27 @@ public class ScannedFieldGenerate : MonoBehaviour
 
     private DelaunayTriangulation2 delaunay;
     public Text PointCloudText;
-    private string TriangleLog;
-    private string PointCloudLog;
+    private string TriangleLog = "";
+    private string PointCloudLog = "";
+    private string DestroyLog = "";
     private string triangleFilePath;
     private string pointcloudFilePath;
+    private string destroyFilePath;
     // Prefab which is generated for each chunk of the mesh.
     public Transform chunkPrefab = null;
-    public GameObject ScannedFieldPrefab;
     public GameObject sphere;
 
+    private int turn = 10;
     private bool draw = true;
+    private int triangleCount = 1;
 
     void Start()
     {
         // storage/android/data/MYAPP/file/TriangleLog.txt
         triangleFilePath = Application.persistentDataPath + "/TriangleLog.txt";
         pointcloudFilePath = Application.persistentDataPath + "/PointCloudLog.txt";
+        destroyFilePath = Application.persistentDataPath + "/DestroyLog.txt";
+
 
         if (File.Exists(triangleFilePath))
         {
@@ -60,8 +65,18 @@ public class ScannedFieldGenerate : MonoBehaviour
                 Debug.LogError("cannot delete file");
             }
         }
-        //Generate();
-        //MakeMesh();
+        if (File.Exists(destroyFilePath))
+        {
+            try
+            {
+                File.Delete(pointcloudFilePath);
+                Debug.Log("file delete");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("cannot delete file");
+            }
+        }
     }
 
     // Update is called once per frame
@@ -73,15 +88,23 @@ public class ScannedFieldGenerate : MonoBehaviour
             return;
         }
         ClearListPoints();
-        AddAllPointsToList();
-        if (PointClouds.Count > 10)
+        if (draw)
         {
-            WorldToScreenCoordinate();
-            DelaunayTriangulation();
-            // DrawPointsAndLines();
-            UpdateMesh();
+            if (Frame.PointCloud.IsUpdatedThisFrame && Frame.PointCloud.PointCount >= 10)
+            {
+                AddAllPointsToList();
+                WorldToScreenCoordinate();
+                DelaunayTriangulation();
+                // DrawPointsAndLines();
+                UpdateMesh();
+                draw = false;
+            }
         }
-
+        if(turn % 30 == 0)
+        {
+            draw = true;
+        }
+        turn += 1;
     }
 
     private void OnDisable()
@@ -97,19 +120,20 @@ public class ScannedFieldGenerate : MonoBehaviour
 
     private void AddAllPointsToList()
     {
+        DestroyLog = "";
         if (Frame.PointCloud.IsUpdatedThisFrame && Frame.PointCloud.PointCount >= 10)
         {
             for (int i = 0; i < Frame.PointCloud.PointCount; i++)
             {
-                PointCloudPoint point = Frame.PointCloud.GetPointAsStruct(i);
-                // if the distance from point cloud to camera is less than 5 meter
+                PointCloudPoint point = Frame.PointCloud.GetPointAsStruct(i);               
+                // if the distance from point cloud to camera is less than limitDistance meter
                 if (Vector3.Distance(point.Position, Cam.transform.position) < limitDistance)
                 {
                     PointClouds.Add(point.Position);
-                }               
+                }
+                CamRaycast(point.Position);
             }
-            PointCloudLog = "PointClouds:" + PointClouds.Count + "\n";
-            PointCloudText.text = "PointClouds:" + PointClouds.Count + "\n";
+            WriteToFile(destroyFilePath, DestroyLog);
         }
     }
 
@@ -119,11 +143,7 @@ public class ScannedFieldGenerate : MonoBehaviour
         {
             Vector3 point = Cam.WorldToScreenPoint(PointClouds[i]);
             PointClouds2D.Add(new Vector3(point.x, point.y, point.z));
-
-            PointCloudLog += "(" + PointClouds[i].x + ", " + PointClouds[i].y + ", " + PointClouds[i].z + "); ";
-            PointCloudLog += "(" + point.x + ", " + point.y + ", " + point.z + "); \n";
         }
-        // WriteToFile(pointcloudFilePath, PointCloudLog);
     }
 
     private void DelaunayTriangulation()
@@ -168,20 +188,35 @@ public class ScannedFieldGenerate : MonoBehaviour
             return;
         }
 
-        List<Vector3> vertices = new List<Vector3>();
-        List<Vector3> normals = new List<Vector3>();
-        List<Vector2> uvs = new List<Vector2>();
-        List<int> triangles = new List<int>();
-
-        TriangleLog += "TriangleCount:" + delaunay.Cells.Count + "\nTriangleID:\n";
         foreach (DelaunayCell<Vertex2> cell in delaunay.Cells)
-        {
+        {           
             List<Vector3> triangleVertices = GetWorldCoordinate(cell.Simplex);
-
             Transform chunk = Instantiate<Transform>(chunkPrefab, transform.position, transform.rotation);
-            chunk.GetComponent<ScannedFieldVisualizer>().Initialize(triangleVertices);
+            chunk.GetComponent<ScannedFieldVisualizer>().Initialize(triangleCount, triangleVertices);
+            triangleCount += 1;
+        }
+    }
 
-           
+    private void CamRaycast(Vector3 destination)
+    {
+        Ray ray = Cam.ScreenPointToRay(Cam.WorldToScreenPoint(destination));
+        RaycastHit hit;
+        if(Physics.Raycast(ray, out hit))
+        {
+            PointCloudText.text = "" + hit.transform.name;
+            if(hit.distance < Vector3.Distance(destination, Cam.transform.position) && Vector3.Dot(Cam.transform.forward, hit.normal) < 0) // && 面朝向camera
+            {
+                // destroy the mesh that raycast collide
+                DestroyLog += "Destroy " + hit.transform.name + "\n";
+                Destroy(hit.transform.gameObject);
+                
+            }
+            else if(hit.distance > Vector3.Distance(destination, Cam.transform.position) && Vector3.Dot(Cam.transform.forward, hit.normal) < 0) // && 面朝向camera
+            {
+                // remove the pointcloud that already have mesh behind it
+                DestroyLog += "Destroy PointCloud (" + PointClouds[PointClouds.Count - 1].x + "," + PointClouds[PointClouds.Count - 1].y + "," + PointClouds[PointClouds.Count - 1].z + ")\n";
+                PointClouds.RemoveAt(PointClouds.Count - 1);
+            }
         }
     }
 
@@ -220,34 +255,3 @@ public class ScannedFieldGenerate : MonoBehaviour
     }
 }
 
-/*triangles.Clear();
-           triangles.Add(0);
-           triangles.Add(1);
-           triangles.Add(2);
-
-           vertices.Clear();
-           vertices.Add(triangleVertices[0]);
-           vertices.Add(triangleVertices[1]);
-           vertices.Add(triangleVertices[2]);
-
-           Vector3 normal = Vector3.Cross(triangleVertices[1] - triangleVertices[0], triangleVertices[2] - triangleVertices[0]);
-           normals.Clear();
-           normals.Add(normal);
-           normals.Add(normal);
-           normals.Add(normal);
-
-           uvs.Clear();
-           uvs.Add(new Vector2(0.0f, 0.0f));
-           uvs.Add(new Vector2(0.0f, 0.0f));
-           uvs.Add(new Vector2(0.0f, 0.0f));
-
-           Mesh chunkMesh = new Mesh();
-           chunkMesh.vertices = vertices.ToArray();
-           chunkMesh.uv = uvs.ToArray();
-           chunkMesh.triangles = triangles.ToArray();
-           chunkMesh.normals = normals.ToArray();
-
-           Transform chunk = Instantiate<Transform>(chunkPrefab, transform.position, transform.rotation);
-           chunk.GetComponent<MeshFilter>().mesh = chunkMesh;
-           chunk.GetComponent<MeshCollider>().sharedMesh = chunkMesh;
-           chunk.transform.parent = transform;*/

@@ -423,6 +423,7 @@ MonoBehaviour:
   Cam: {fileID: 1930229005}
   PointClouds: []
   PointClouds2D: []
+  limitDistance: 0
   PointCloudText: {fileID: 674128590}
   chunkPrefab: {fileID: 4760822391077712, guid: 00a4cb1aab563c343a0424f38f2ed8f0,
     type: 3}
@@ -754,7 +755,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1829515894
 MonoBehaviour:
   m_ObjectHideFlags: 0

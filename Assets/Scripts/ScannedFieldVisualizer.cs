@@ -11,6 +11,7 @@ public class ScannedFieldVisualizer : MonoBehaviour
     private List<Vector2> uvs = new List<Vector2>();
     private List<int> indices = new List<int>();
     private List<Color> colors = new List<Color>();
+    private int triangleID;
 
     /// <summary>
     /// The Unity Awake() method.
@@ -21,15 +22,16 @@ public class ScannedFieldVisualizer : MonoBehaviour
 
     public void Update()
     {
-        Destroy(gameObject);
+        // Destroy(gameObject);
     }
 
     /// <summary>
     /// Initializes the DetectedPlaneVisualizer with a DetectedPlane.
     /// </summary>
     /// <param name="plane">The plane to vizualize.</param>
-    public void Initialize(List<Vector3> triangleVertices)
+    public void Initialize(int ID, List<Vector3> triangleVertices)
     {
+        triangleID = ID;
         vertices = triangleVertices;
 
         // m_MeshRenderer.material.SetColor("_GridColor", new Color(238f / 255f, 238f / 255f, 209f / 255f, 1f));
@@ -44,9 +46,9 @@ public class ScannedFieldVisualizer : MonoBehaviour
     private void _UpdateMeshIfNeeded()
     {
         colors.Clear();
-        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 1f));
-        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 1f));
-        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 1f));
+        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 0.7f));
+        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 0.7f));
+        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 0.7f));
 
         indices.Clear();
         indices.Add(0);
@@ -73,6 +75,12 @@ public class ScannedFieldVisualizer : MonoBehaviour
         this.GetComponent<MeshFilter>().mesh = chunkMesh;
         this.GetComponent<MeshCollider>().sharedMesh = chunkMesh;
         this.transform.parent = transform;
+        gameObject.name = "Mesh " + triangleID;
+    }
+
+    public int GetTriangleID()
+    {
+        return triangleID;
     }
 
 }
