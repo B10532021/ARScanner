@@ -7,69 +7,42 @@ using GoogleARCore;
 using HullDelaunayVoronoi.Delaunay;
 using HullDelaunayVoronoi.Primitives;
 using DrawingTool;
+using DataStructures.ViliWonka.KDTree;
+using GoogleARCore.Examples.ComputerVision;
 
 public class ScannedFieldGenerate : MonoBehaviour
 {
     // AR parameter
     public Camera Cam;
-    public List<Vector3> PointClouds = new List<Vector3>();
-    public List<Vector3> PointClouds2D = new List<Vector3>();
+    public GameObject CamTarget;
+    private List<Vector3> PointClouds = new List<Vector3>();
+    private List<Vector3> PointClouds2D = new List<Vector3>();
+    private List<List<int>> Clusters = new List<List<int>>();
     public int limitDistance;
-    // The delaunay mesh
+    public float radius;
 
+    // The delaunay mesh
     private DelaunayTriangulation2 delaunay;
     public Text PointCloudText;
-    private string TriangleLog = "";
-    private string PointCloudLog = "";
-    private string DestroyLog = "";
-    private string triangleFilePath;
-    private string pointcloudFilePath;
-    private string destroyFilePath;
+    private string Log = "";
+    private string FilePath;
     // Prefab which is generated for each chunk of the mesh.
     public Transform chunkPrefab = null;
     public GameObject sphere;
 
-    private int turn = 10;
-    private bool draw = true;
     private int triangleCount = 1;
+    private bool draw = true;
+    private int turn = 0;
 
     void Start()
     {
         // storage/android/data/MYAPP/file/TriangleLog.txt
-        triangleFilePath = Application.persistentDataPath + "/TriangleLog.txt";
-        pointcloudFilePath = Application.persistentDataPath + "/PointCloudLog.txt";
-        destroyFilePath = Application.persistentDataPath + "/DestroyLog.txt";
-
-
-        if (File.Exists(triangleFilePath))
+        FilePath = Application.persistentDataPath + "/Log.txt";
+        if (File.Exists(FilePath))
         {
             try
             {
-                File.Delete(triangleFilePath);
-                Debug.Log("file delete");
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError("cannot delete file");
-            }
-        }
-        if (File.Exists(pointcloudFilePath))
-        {
-            try
-            {
-                File.Delete(pointcloudFilePath);
-                Debug.Log("file delete");
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError("cannot delete file");
-            }
-        }
-        if (File.Exists(destroyFilePath))
-        {
-            try
-            {
-                File.Delete(pointcloudFilePath);
+                File.Delete(FilePath);
                 Debug.Log("file delete");
             }
             catch (System.Exception e)
@@ -85,26 +58,32 @@ public class ScannedFieldGenerate : MonoBehaviour
         // If ARCore is not tracking, clear the caches and don't update.
         if (Session.Status != SessionStatus.Tracking)
         {
+            ClearListPoints();
             return;
         }
         ClearListPoints();
-        if (draw)
+        if (draw && Frame.PointCloud.IsUpdatedThisFrame && Frame.PointCloud.PointCount > 10)
         {
-            if (Frame.PointCloud.IsUpdatedThisFrame && Frame.PointCloud.PointCount >= 10)
+            AddAllPointsToList();
+            WorldToScreenCoordinate();
+            ClusterExtraction();
+            for (int i = 0; i < Clusters.Count; i++)
             {
-                AddAllPointsToList();
-                WorldToScreenCoordinate();
-                DelaunayTriangulation();
-                // DrawPointsAndLines();
+                if(Clusters[i].Count < 3)
+                {
+                    continue;
+                }
+                DelaunayTriangulation(Clusters[i]);
                 UpdateMesh();
-                draw = false;
             }
+            draw = false;  
         }
         if(turn % 30 == 0)
         {
             draw = true;
         }
         turn += 1;
+        
     }
 
     private void OnDisable()
@@ -116,25 +95,84 @@ public class ScannedFieldGenerate : MonoBehaviour
     {
         PointClouds.Clear();
         PointClouds2D.Clear();
+        Clusters.Clear();
     }
 
     private void AddAllPointsToList()
     {
-        DestroyLog = "";
-        if (Frame.PointCloud.IsUpdatedThisFrame && Frame.PointCloud.PointCount >= 10)
+        if (Frame.PointCloud.IsUpdatedThisFrame)
         {
             for (int i = 0; i < Frame.PointCloud.PointCount; i++)
             {
                 PointCloudPoint point = Frame.PointCloud.GetPointAsStruct(i);               
                 // if the distance from point cloud to camera is less than limitDistance meter
-                if (Vector3.Distance(point.Position, Cam.transform.position) < limitDistance)
+                if (Vector3.Distance(point.Position, CamTarget.transform.position) < limitDistance && CamRaycast(point.Position))
                 {
                     PointClouds.Add(point.Position);
                 }
-                CamRaycast(point.Position);
             }
-            WriteToFile(destroyFilePath, DestroyLog);
         }
+    }
+
+    private void ClusterExtraction()
+    {
+        int maxPointsPerLeafNode = 32;
+        KDTree tree = new KDTree(PointClouds.ToArray(), maxPointsPerLeafNode);
+        KDQuery query = new KDQuery();
+        List<int> results = new List<int>();
+        List<int> temp = new List<int>();
+        int clusterCounts = 0;
+
+        Log = " Frame PointClouds Count:" + Frame.PointCloud.PointCount + "\n";
+        Log += " PointClouds Count:" + PointClouds.Count + "\n";
+        for (int i = 0; i < PointClouds.Count; i++)
+        {
+            bool next = false;
+            for (int j = 0; j < Clusters.Count; j++)
+            {
+                if (Clusters[j].Contains(i))
+                {
+                    next = true;
+                    break;
+                }
+            }
+            if (next)
+            {
+                continue;
+            }
+            results.Clear();
+            temp.Clear();
+
+            query.Radius(tree, PointClouds[i], radius, temp);
+            results.AddRange(temp);
+            for (int j = 1; j < results.Count; j++)
+            {
+                temp.Clear();
+                query.Radius(tree, PointClouds[results[j]], radius, temp);
+
+                for (int k = 0; k < temp.Count; k++)
+                {
+                    if (!results.Contains(temp[k]))
+                    {
+                        results.Add(temp[k]);
+                    }
+                }
+            }
+            Clusters.Add(new List<int>());
+            Clusters[clusterCounts].AddRange(results);
+            clusterCounts += 1;
+        }
+
+        for (int i = 0; i < Clusters.Count; i++)
+        {
+            Log += "Cluster" + i + "\n";
+            for (int j = 0; j < Clusters[i].Count; j++)
+            {
+                Log += Clusters[i][j] + ",";
+            }
+            Log += "\n";
+        }
+        WriteToFile(FilePath, Log);
     }
 
     private void WorldToScreenCoordinate()
@@ -146,13 +184,26 @@ public class ScannedFieldGenerate : MonoBehaviour
         }
     }
 
-    private void DelaunayTriangulation()
+    private void DelaunayTriangulation(List<int> pointsIndices)
     {
-        List<Vertex2> vertices = new List<Vertex2>();
+        /*List<Vertex2> vertices = new List<Vertex2>();
         for (int i = 0; i < PointClouds2D.Count; i++)
         {
             Vertex2 point = new Vertex2(PointClouds2D[i].x, PointClouds2D[i].y);
             point.SetIDAndDepth(i + 1, PointClouds2D[i].z);
+            vertices.Add(point);
+        }
+        delaunay = new DelaunayTriangulation2();
+        delaunay.Generate(vertices);*/
+        if(pointsIndices.Count < 3)
+        {
+            return;
+        }
+        List<Vertex2> vertices = new List<Vertex2>();
+        for (int i = 0; i < pointsIndices.Count; i++)
+        {
+            Vertex2 point = new Vertex2(PointClouds2D[pointsIndices[i]].x, PointClouds2D[pointsIndices[i]].y);
+            point.SetIDAndDepth(i + 1, PointClouds2D[pointsIndices[i]].z);
             vertices.Add(point);
         }
         delaunay = new DelaunayTriangulation2();
@@ -191,33 +242,41 @@ public class ScannedFieldGenerate : MonoBehaviour
         foreach (DelaunayCell<Vertex2> cell in delaunay.Cells)
         {           
             List<Vector3> triangleVertices = GetWorldCoordinate(cell.Simplex);
+            if(Vector3.Distance(triangleVertices[0], triangleVertices[1]) > limitDistance || Vector3.Distance(triangleVertices[0], triangleVertices[2]) > limitDistance || Vector3.Distance(triangleVertices[1], triangleVertices[2]) > limitDistance)
+            {
+                continue;
+            }
             Transform chunk = Instantiate<Transform>(chunkPrefab, transform.position, transform.rotation);
             chunk.GetComponent<ScannedFieldVisualizer>().Initialize(triangleCount, triangleVertices);
             triangleCount += 1;
         }
     }
 
-    private void CamRaycast(Vector3 destination)
+    private bool CamRaycast(Vector3 destination)
     {
-        Ray ray = Cam.ScreenPointToRay(Cam.WorldToScreenPoint(destination));
         RaycastHit hit;
-        if(Physics.Raycast(ray, out hit))
+        if(Physics.Raycast(CamTarget.transform.position, destination, out hit))
         {
             PointCloudText.text = "" + hit.transform.name;
-            if(hit.distance < Vector3.Distance(destination, Cam.transform.position) && Vector3.Dot(Cam.transform.forward, hit.normal) < 0) // && 面朝向camera
+            if(hit.distance <= Vector3.Distance(destination, CamTarget.transform.position)) // && 面朝向camera
             {
                 // destroy the mesh that raycast collide
-                DestroyLog += "Destroy " + hit.transform.name + "\n";
                 Destroy(hit.transform.gameObject);
                 
             }
-            else if(hit.distance > Vector3.Distance(destination, Cam.transform.position) && Vector3.Dot(Cam.transform.forward, hit.normal) < 0) // && 面朝向camera
+            else if(hit.distance > Vector3.Distance(destination, CamTarget.transform.position) && Vector3.Dot(CamTarget.transform.forward, hit.normal) < 0) // && 面朝向camera
             {
                 // remove the pointcloud that already have mesh behind it
-                DestroyLog += "Destroy PointCloud (" + PointClouds[PointClouds.Count - 1].x + "," + PointClouds[PointClouds.Count - 1].y + "," + PointClouds[PointClouds.Count - 1].z + ")\n";
-                PointClouds.RemoveAt(PointClouds.Count - 1);
+                return false;
+                // PointClouds.RemoveAt(PointClouds.Count - 1);
             }
         }
+        return true;
+    }
+
+    private void SaveFrameCameraImage()
+    {
+
     }
 
     public void DrawPointsAndLines()
@@ -253,5 +312,6 @@ public class ScannedFieldGenerate : MonoBehaviour
             Debug.LogError("cannot write into file");
         }
     }
+
 }
 

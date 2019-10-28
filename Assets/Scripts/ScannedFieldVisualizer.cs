@@ -71,6 +71,7 @@ public class ScannedFieldVisualizer : MonoBehaviour
         chunkMesh.uv = uvs.ToArray();
         chunkMesh.triangles = indices.ToArray();
         chunkMesh.normals = normals.ToArray();
+        chunkMesh.colors = colors.ToArray();
 
         this.GetComponent<MeshFilter>().mesh = chunkMesh;
         this.GetComponent<MeshCollider>().sharedMesh = chunkMesh;
