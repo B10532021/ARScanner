@@ -8,7 +8,6 @@ using HullDelaunayVoronoi.Delaunay;
 using HullDelaunayVoronoi.Primitives;
 using DrawingTool;
 using DataStructures.ViliWonka.KDTree;
-using GoogleARCore.Examples.ComputerVision;
 
 public class ScannedFieldGenerate : MonoBehaviour
 {
@@ -272,11 +271,6 @@ public class ScannedFieldGenerate : MonoBehaviour
             }
         }
         return true;
-    }
-
-    private void SaveFrameCameraImage()
-    {
-
     }
 
     public void DrawPointsAndLines()
