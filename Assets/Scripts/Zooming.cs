@@ -6,7 +6,6 @@ using UnityEngine.UI;
 public class Zooming : MonoBehaviour
 {
     public GameObject m_firstPersonCamera;
-    public Text camPoseText;
     private float zoomInCur = 0; //current zoom in distance
     private float zoomInMin = 0;
     private float zoomInMax = 15;
@@ -31,7 +30,6 @@ public class Zooming : MonoBehaviour
             float currentMagnitude = (touchZero.position - touchOne.position).magnitude;
 
             float difference = currentMagnitude - prevMagnitude;
-            camPoseText.text = "" + difference;
             if (zoomInCur >= zoomInMin && zoomInCur <= zoomInMax)
             {
                 zoomInCur = zoomInCur - difference * 0.01f;

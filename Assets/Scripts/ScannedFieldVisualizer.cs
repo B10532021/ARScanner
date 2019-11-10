@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using HullDelaunayVoronoi.Delaunay;
 using HullDelaunayVoronoi.Primitives;
 
@@ -12,6 +13,8 @@ public class ScannedFieldVisualizer : MonoBehaviour
     private List<int> indices = new List<int>();
     private List<Color> colors = new List<Color>();
     private int triangleID;
+    private Camera Cam;
+    private Text Log;
 
     /// <summary>
     /// The Unity Awake() method.
@@ -22,7 +25,6 @@ public class ScannedFieldVisualizer : MonoBehaviour
 
     public void Update()
     {
-        // Destroy(gameObject);
     }
 
     /// <summary>
@@ -33,22 +35,18 @@ public class ScannedFieldVisualizer : MonoBehaviour
     {
         triangleID = ID;
         vertices = triangleVertices;
-
-        // m_MeshRenderer.material.SetColor("_GridColor", new Color(238f / 255f, 238f / 255f, 209f / 255f, 1f));
-        // m_MeshRenderer.material.SetFloat("_UvRotation", Random.Range(0.0f, 360.0f));
-
-        _UpdateMeshIfNeeded();
+        CreateInitMesh();
     }
 
     /// <summary>
     /// Update mesh with a list of Vector3 and plane's center position.
     /// </summary>
-    private void _UpdateMeshIfNeeded()
+    private void CreateInitMesh()
     {
         colors.Clear();
-        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 0.7f));
-        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 0.7f));
-        colors.Add(new Color(238f / 255f, 238f / 255f, 209f / 255f, 0.7f));
+        colors.Add(new Color(30f / 255f, 144f / 255f, 1, 0.3f));
+        colors.Add(new Color(30f / 255f, 144f / 255f, 1, 0.3f));
+        colors.Add(new Color(30f / 255f, 144f / 255f, 1, 0.3f));
 
         indices.Clear();
         indices.Add(0);
@@ -78,10 +76,4 @@ public class ScannedFieldVisualizer : MonoBehaviour
         this.transform.parent = transform;
         gameObject.name = "Mesh " + triangleID;
     }
-
-    public int GetTriangleID()
-    {
-        return triangleID;
-    }
-
 }

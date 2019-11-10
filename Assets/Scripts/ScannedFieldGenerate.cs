@@ -1,30 +1,35 @@
 ﻿using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using System.IO;
 using GoogleARCore;
+using GoogleARCore.Examples.ComputerVision;
 using HullDelaunayVoronoi.Delaunay;
 using HullDelaunayVoronoi.Primitives;
 using DrawingTool;
 using DataStructures.ViliWonka.KDTree;
+using VoxelSystem;
 
 public class ScannedFieldGenerate : MonoBehaviour
 {
     // AR parameter
-    public Camera Cam;
-    public GameObject CamTarget;
+    public Camera InnerCam;
     private List<Vector3> PointClouds = new List<Vector3>();
-    private List<Vector3> PointClouds2D = new List<Vector3>();
     private List<List<int>> Clusters = new List<List<int>>();
+    private List<GameObject> VisibleObject = new List<GameObject>();
+    private int newPointCloudsNum;
     public int limitDistance;
-    public float radius;
+    public float Radius;
 
     // The delaunay mesh
     private DelaunayTriangulation2 delaunay;
-    public Text PointCloudText;
-    private string Log = "";
-    private string FilePath;
+
+    // Voxelization + TSDF
+    private float voxelSize = 0.04f;
+
+
     // Prefab which is generated for each chunk of the mesh.
     public Transform chunkPrefab = null;
     public GameObject sphere;
@@ -32,6 +37,10 @@ public class ScannedFieldGenerate : MonoBehaviour
     private int triangleCount = 1;
     private bool draw = true;
     private int turn = 0;
+
+    public Text LogText;
+    private string Log = "";
+    private string FilePath;
 
     void Start()
     {
@@ -57,14 +66,13 @@ public class ScannedFieldGenerate : MonoBehaviour
         // If ARCore is not tracking, clear the caches and don't update.
         if (Session.Status != SessionStatus.Tracking)
         {
-            ClearListPoints();
             return;
         }
         ClearListPoints();
         if (draw && Frame.PointCloud.IsUpdatedThisFrame && Frame.PointCloud.PointCount > 10)
         {
-            AddAllPointsToList();
-            WorldToScreenCoordinate();
+            AddPointsToList();
+            AddMeshVerticesToList();
             ClusterExtraction();
             for (int i = 0; i < Clusters.Count; i++)
             {
@@ -77,12 +85,11 @@ public class ScannedFieldGenerate : MonoBehaviour
             }
             draw = false;  
         }
-        if(turn % 30 == 0)
+        if(turn % 15 == 0)
         {
             draw = true;
         }
         turn += 1;
-        
     }
 
     private void OnDisable()
@@ -90,24 +97,42 @@ public class ScannedFieldGenerate : MonoBehaviour
         ClearListPoints();
     }
 
-    public void ClearListPoints()
+    private void ClearListPoints()
     {
         PointClouds.Clear();
-        PointClouds2D.Clear();
         Clusters.Clear();
     }
 
-    private void AddAllPointsToList()
+    private void AddPointsToList()
     {
-        if (Frame.PointCloud.IsUpdatedThisFrame)
+        for (int i = 0; i < Frame.PointCloud.PointCount; i++)
         {
-            for (int i = 0; i < Frame.PointCloud.PointCount; i++)
+            PointCloudPoint point = Frame.PointCloud.GetPointAsStruct(i);
+
+            if (Vector3.Distance(point.Position, InnerCam.transform.position) < limitDistance && CamRaycast(point.Position))
             {
-                PointCloudPoint point = Frame.PointCloud.GetPointAsStruct(i);               
-                // if the distance from point cloud to camera is less than limitDistance meter
-                if (Vector3.Distance(point.Position, CamTarget.transform.position) < limitDistance && CamRaycast(point.Position))
-                {
                     PointClouds.Add(point.Position);
+            }
+        }
+        newPointCloudsNum = PointClouds.Count;
+    }
+
+    private void AddMeshVerticesToList()
+    {
+        if(VisibleObject.Count == 0)
+        {
+            return;
+        }
+        for (int i = 0; i < VisibleObject.Count; i++)
+        {
+            Vector3[] vertices = VisibleObject[i].GetComponent<MeshFilter>().mesh.vertices;
+            foreach (Vector3 vertex in vertices)
+            {
+                Vector3 pointOnScreen = InnerCam.WorldToScreenPoint(vertex);
+                //Is in FOV
+                if ((pointOnScreen.x >= 0) && (pointOnScreen.x < Screen.width) && (pointOnScreen.y >= 0) || (pointOnScreen.y < Screen.height))
+                {
+                    PointClouds.Add(vertex);
                 }
             }
         }
@@ -115,6 +140,7 @@ public class ScannedFieldGenerate : MonoBehaviour
 
     private void ClusterExtraction()
     {
+        // KDTree
         int maxPointsPerLeafNode = 32;
         KDTree tree = new KDTree(PointClouds.ToArray(), maxPointsPerLeafNode);
         KDQuery query = new KDQuery();
@@ -122,9 +148,7 @@ public class ScannedFieldGenerate : MonoBehaviour
         List<int> temp = new List<int>();
         int clusterCounts = 0;
 
-        Log = " Frame PointClouds Count:" + Frame.PointCloud.PointCount + "\n";
-        Log += " PointClouds Count:" + PointClouds.Count + "\n";
-        for (int i = 0; i < PointClouds.Count; i++)
+        for (int i = 0; i < newPointCloudsNum; i++)
         {
             bool next = false;
             for (int j = 0; j < Clusters.Count; j++)
@@ -142,58 +166,32 @@ public class ScannedFieldGenerate : MonoBehaviour
             results.Clear();
             temp.Clear();
 
-            query.Radius(tree, PointClouds[i], radius, temp);
+            query.Radius(tree, PointClouds[i], Radius, temp);
             results.AddRange(temp);
             for (int j = 1; j < results.Count; j++)
             {
-                temp.Clear();
-                query.Radius(tree, PointClouds[results[j]], radius, temp);
-
-                for (int k = 0; k < temp.Count; k++)
+                if (results[j] < newPointCloudsNum)
                 {
-                    if (!results.Contains(temp[k]))
+                    temp.Clear();
+                    query.Radius(tree, PointClouds[results[j]], Radius, temp);
+
+                    for (int k = 0; k < temp.Count; k++)
                     {
-                        results.Add(temp[k]);
+                        if (!results.Contains(temp[k]))
+                        {
+                            results.Add(temp[k]);
+                        }
                     }
-                }
+                } 
             }
             Clusters.Add(new List<int>());
             Clusters[clusterCounts].AddRange(results);
             clusterCounts += 1;
         }
-
-        for (int i = 0; i < Clusters.Count; i++)
-        {
-            Log += "Cluster" + i + "\n";
-            for (int j = 0; j < Clusters[i].Count; j++)
-            {
-                Log += Clusters[i][j] + ",";
-            }
-            Log += "\n";
-        }
-        WriteToFile(FilePath, Log);
-    }
-
-    private void WorldToScreenCoordinate()
-    {
-        for (int i = 0; i < PointClouds.Count; i++)
-        {
-            Vector3 point = Cam.WorldToScreenPoint(PointClouds[i]);
-            PointClouds2D.Add(new Vector3(point.x, point.y, point.z));
-        }
     }
 
     private void DelaunayTriangulation(List<int> pointsIndices)
     {
-        /*List<Vertex2> vertices = new List<Vertex2>();
-        for (int i = 0; i < PointClouds2D.Count; i++)
-        {
-            Vertex2 point = new Vertex2(PointClouds2D[i].x, PointClouds2D[i].y);
-            point.SetIDAndDepth(i + 1, PointClouds2D[i].z);
-            vertices.Add(point);
-        }
-        delaunay = new DelaunayTriangulation2();
-        delaunay.Generate(vertices);*/
         if(pointsIndices.Count < 3)
         {
             return;
@@ -201,8 +199,9 @@ public class ScannedFieldGenerate : MonoBehaviour
         List<Vertex2> vertices = new List<Vertex2>();
         for (int i = 0; i < pointsIndices.Count; i++)
         {
-            Vertex2 point = new Vertex2(PointClouds2D[pointsIndices[i]].x, PointClouds2D[pointsIndices[i]].y);
-            point.SetIDAndDepth(i + 1, PointClouds2D[pointsIndices[i]].z);
+            Vector3 pointcloud2D = InnerCam.WorldToScreenPoint(PointClouds[pointsIndices[i]]);
+            Vertex2 point = new Vertex2(pointcloud2D.x, pointcloud2D.y);
+            point.SetIDAndDepth(i + 1, pointcloud2D.z);
             vertices.Add(point);
         }
         delaunay = new DelaunayTriangulation2();
@@ -210,28 +209,41 @@ public class ScannedFieldGenerate : MonoBehaviour
 
     }
 
-    public List<Vector3> GetWorldCoordinate(Simplex<Vertex2> points)
+    private List<Vector3> GetWorldCoordinate(Simplex<Vertex2> points)
     {
         List<Vector3> vertices = new List<Vector3>();
         // positive if points are CCW negative if they're CW
         if((points.Vertices[1].X - points.Vertices[0].X) * (points.Vertices[2].Y - points.Vertices[0].Y)
             - (points.Vertices[2].X - points.Vertices[0].X) * (points.Vertices[1].Y - points.Vertices[0].Y) < 0)
         {
-            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[0].X, points.Vertices[0].Y, points.Vertices[0].depth)));
-            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[1].X, points.Vertices[1].Y, points.Vertices[1].depth)));
-            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[2].X, points.Vertices[2].Y, points.Vertices[2].depth)));
+            vertices.Add(InnerCam.ScreenToWorldPoint(new Vector3(points.Vertices[0].X, points.Vertices[0].Y, points.Vertices[0].depth)));
+            vertices.Add(InnerCam.ScreenToWorldPoint(new Vector3(points.Vertices[1].X, points.Vertices[1].Y, points.Vertices[1].depth)));
+            vertices.Add(InnerCam.ScreenToWorldPoint(new Vector3(points.Vertices[2].X, points.Vertices[2].Y, points.Vertices[2].depth)));
         }
         else
         {
-            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[0].X, points.Vertices[0].Y, points.Vertices[0].depth)));
-            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[2].X, points.Vertices[2].Y, points.Vertices[2].depth)));
-            vertices.Add(Cam.ScreenToWorldPoint(new Vector3(points.Vertices[1].X, points.Vertices[1].Y, points.Vertices[1].depth)));
+            vertices.Add(InnerCam.ScreenToWorldPoint(new Vector3(points.Vertices[0].X, points.Vertices[0].Y, points.Vertices[0].depth)));
+            vertices.Add(InnerCam.ScreenToWorldPoint(new Vector3(points.Vertices[2].X, points.Vertices[2].Y, points.Vertices[2].depth)));
+            vertices.Add(InnerCam.ScreenToWorldPoint(new Vector3(points.Vertices[1].X, points.Vertices[1].Y, points.Vertices[1].depth)));
         }
 
         return vertices;
     }
 
-    public void UpdateMesh()
+    private void Voxelization()
+    {
+        if (delaunay == null || delaunay.Cells.Count == 0 || delaunay.Vertices.Count == 0)
+        {
+            return;
+        }
+
+        foreach (DelaunayCell<Vertex2> cell in delaunay.Cells)
+        {
+            List<Vector3> triangleVertices = GetWorldCoordinate(cell.Simplex);
+        }
+    }
+
+    private void UpdateMesh()
     {
         if (delaunay == null || delaunay.Cells.Count == 0 || delaunay.Vertices.Count == 0)
         {
@@ -241,36 +253,64 @@ public class ScannedFieldGenerate : MonoBehaviour
         foreach (DelaunayCell<Vertex2> cell in delaunay.Cells)
         {           
             List<Vector3> triangleVertices = GetWorldCoordinate(cell.Simplex);
-            if(Vector3.Distance(triangleVertices[0], triangleVertices[1]) > limitDistance || Vector3.Distance(triangleVertices[0], triangleVertices[2]) > limitDistance || Vector3.Distance(triangleVertices[1], triangleVertices[2]) > limitDistance)
-            {
-                continue;
-            }
+
             Transform chunk = Instantiate<Transform>(chunkPrefab, transform.position, transform.rotation);
             chunk.GetComponent<ScannedFieldVisualizer>().Initialize(triangleCount, triangleVertices);
             triangleCount += 1;
         }
     }
 
+    // 這個還有問題
     private bool CamRaycast(Vector3 destination)
     {
         RaycastHit hit;
-        if(Physics.Raycast(CamTarget.transform.position, destination, out hit))
+        if(Physics.Raycast(InnerCam.transform.position, destination, out hit) && Vector3.Dot(InnerCam.transform.forward, hit.normal) < 0)
         {
-            PointCloudText.text = "" + hit.transform.name;
-            if(hit.distance <= Vector3.Distance(destination, CamTarget.transform.position)) // && 面朝向camera
+            if(hit.distance < Vector3.Distance(destination, InnerCam.transform.position)) // && 面朝向camera
             {
-                // destroy the mesh that raycast collide
-                Destroy(hit.transform.gameObject);
-                
+                if (Vector3.Distance(destination, InnerCam.transform.position) - hit.distance < 0.03)
+                {
+                    Vector3[] vertices = hit.transform.gameObject.GetComponent<MeshFilter>().mesh.vertices;
+                    foreach (Vector3 vert in vertices)
+                    {
+                        if (Vector3.Distance(vert, destination) < 0.01)
+                        {
+                            break;
+                        }
+                    }
+                    return false;
+                }
+                else
+                {
+                    RemoveVisibleObject(hit.transform.gameObject);
+                    Destroy(hit.transform.gameObject);
+                    return true;
+                }               
             }
-            else if(hit.distance > Vector3.Distance(destination, CamTarget.transform.position) && Vector3.Dot(CamTarget.transform.forward, hit.normal) < 0) // && 面朝向camera
-            {
+            else if (hit.distance >= Vector3.Distance(destination, InnerCam.transform.position) && hit.distance - Vector3.Distance(destination, InnerCam.transform.position) < 0.03)
+            { 
                 // remove the pointcloud that already have mesh behind it
                 return false;
-                // PointClouds.RemoveAt(PointClouds.Count - 1);
             }
+            return true;
         }
         return true;
+    }
+
+    public void AddVisibleObject(GameObject gameobject)
+    {
+        if (!VisibleObject.Contains(gameobject))
+        {
+            VisibleObject.Add(gameobject);
+        }
+    }
+
+    public void RemoveVisibleObject(GameObject gameobject)
+    {
+        if (VisibleObject.Contains(gameobject))
+        {
+            VisibleObject.Remove(gameobject);
+        }
     }
 
     public void DrawPointsAndLines()

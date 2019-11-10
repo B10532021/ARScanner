@@ -1,14 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using GoogleARCore;
 using UnityEngine.UI;
+using GoogleARCore.Examples.ComputerVision;
 
 public class ARScannerController : MonoBehaviour
 {
-    public Text camPoseText;
     public GameObject m_firstPersonCamera;
-    public GameObject cameraTarget;
+    public Camera m_innerCamera;
+    public Text CameraIntrinsicsOutput;
     private Vector3 m_prevARPosePosition;
     private bool trackingStarted = false;
 
@@ -36,14 +38,7 @@ public class ARScannerController : MonoBehaviour
         //Remember the previous position so we can apply deltas
         Vector3 deltaPosition = currentARPosition - m_prevARPosePosition;
         m_prevARPosePosition = currentARPosition;
-        if (cameraTarget != null)
-        {
-            // The initial forward vector of the sphere must be aligned with the initial camera direction in the XZ plane.
-            // We apply translation only in the XZ plane.
-            cameraTarget.transform.Translate(deltaPosition.x, deltaPosition.y, deltaPosition.z);
-            // Set the pose rotation to be used in the CameraFollow script
-            m_firstPersonCamera.GetComponent<FollowTarget>().targetRot = Frame.Pose.rotation;
-        }
+        CameraIntrinsicsOutput.text = _CameraIntrinsicsToString(Frame.CameraImage.TextureIntrinsics, "GPU Texture");
     }
 
     /// <summary>
@@ -108,6 +103,22 @@ public class ARScannerController : MonoBehaviour
         }
     }
 
-    
+    private string _CameraIntrinsicsToString(CameraIntrinsics intrinsics, string intrinsicsType)
+    {
+        float fovX = 2.0f * Mathf.Rad2Deg * Mathf.Atan2(
+            intrinsics.ImageDimensions.x, 2 * intrinsics.FocalLength.x);
+        float fovY = 2.0f * Mathf.Rad2Deg * Mathf.Atan2(
+            intrinsics.ImageDimensions.y, 2 * intrinsics.FocalLength.y);
+
+        string message = string.Format(
+            "Unrotated Camera {4} Intrinsics:{0}  Focal Length: {1}{0}  " +
+            "Principal Point: {2}{0}  Image Dimensions: {3}{0}  " +
+            "Unrotated Field of View: ({5}°, {6}°){0}",
+            Environment.NewLine, intrinsics.FocalLength.ToString(),
+            intrinsics.PrincipalPoint.ToString(), intrinsics.ImageDimensions.ToString(),
+            intrinsicsType, fovX, fovY);
+        return message;
+    }
+
 }
 
